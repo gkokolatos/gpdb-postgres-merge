@@ -3231,6 +3231,7 @@ typedef struct AlterSystemStmt
 {
 	NodeTag		type;
 	VariableSetStmt *setstmt;	/* SET subcommand */
+	bool		dispatch;		/* GPDB: apply the change to segments also */
 } AlterSystemStmt;
 
 /* ----------------------

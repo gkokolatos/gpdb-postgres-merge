@@ -1344,6 +1344,15 @@ _outAlterTableSpaceOptionsStmt(StringInfo str, AlterTableSpaceOptionsStmt *node)
 	WRITE_BOOL_FIELD(isReset);
 }
 
+static void
+_outAlterSystemStmt(StringInfo str, AlterSystemStmt *node)
+{
+	WRITE_NODE_TYPE("ALTERSYSTEMSTMT");
+
+	WRITE_NODE_FIELD(setstmt);
+	/* Should not serialize dispatch */
+}
+
 /*
  * _outNode -
  *	  converts a Node into binary string and append it to 'str'
@@ -2323,6 +2332,10 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_CreateTransformStmt:
 				_outCreateTransformStmt(str, obj);
+				break;
+
+			case T_AlterSystemStmt:
+				_outAlterSystemStmt(str, obj);
 				break;
 
 			default:

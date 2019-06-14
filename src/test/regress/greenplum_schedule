@@ -237,6 +237,10 @@ test: psql_gp_commands pg_resetxlog dropdb_check_shared_buffer_cache gp_upgrade_
 # Check for shmem leak for instrumentation slots
 test: instr_in_shmem_verify
 
+# This test alters for its duration configuration settings so it can not be run
+# in parallel
+test: gp_alter_system
+
 # This cannot run in parallel because other tests could increment the Oid
 # counters and make the Oid counter observations hardcoded in the answer file
 # incorrect.

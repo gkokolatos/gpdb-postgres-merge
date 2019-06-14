@@ -3095,6 +3095,15 @@ _readGpPolicy(void)
 	READ_DONE();
 }
 
+static AlterSystemStmt *
+_readAlterSystemStmt(void)
+{
+	READ_LOCALS(AlterSystemStmt);
+
+	READ_NODE_FIELD(setstmt);
+
+	READ_DONE();
+}
 
 static void *
 readNodeBinary(void)
@@ -3999,6 +4008,10 @@ readNodeBinary(void)
 
 			case T_LockingClause:
 				return_value = _readLockingClause();
+				break;
+
+			case T_AlterSystemStmt:
+				return_value = _readAlterSystemStmt();
 				break;
 
 			default:

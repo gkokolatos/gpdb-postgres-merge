@@ -7142,6 +7142,11 @@ AlterSystemSetConfigFile(AlterSystemStmt *altersysstmt)
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 			 (errmsg("must be superuser to execute ALTER SYSTEM command"))));
 
+	if (altersysstmt->dispatch && Gp_role != GP_ROLE_DISPATCH)
+		ereport(ERROR,
+			(errcode(ERRCODE_GP_COMMAND_ERROR),
+			(errmsg("cannot DISPATCH an ALTER SYSTEM command from segment"))));
+
 	/*
 	 * Extract statement arguments
 	 */
@@ -7310,6 +7315,13 @@ AlterSystemSetConfigFile(AlterSystemStmt *altersysstmt)
 		/* Close before renaming; may be required on some platforms */
 		close(Tmpfd);
 		Tmpfd = -1;
+
+		/*
+		 * GPDB: Try to distribute the statement to the segments before renaming
+		 * so that on error we will not apply the configuration on QD
+		 */
+		if (altersysstmt->dispatch && Gp_role == GP_ROLE_DISPATCH)
+			CdbDispatchUtilityStatement((Node *)altersysstmt, DF_CANCEL_ON_ERROR, NIL, NULL);
 
 		/*
 		 * As the rename is atomic operation, if any problem occurs after this

@@ -320,6 +320,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <boolean>	opt_or_replace
 				opt_grant_grant_option opt_grant_admin_option
 				opt_nowait opt_if_exists opt_with_data
+%type <boolean> opt_dispatch
 %type <ival>	opt_nowait_or_skip
 
 %type <list>	OptRoleList AlterOptRoleList
@@ -666,7 +667,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DECLARE DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DESC
-	DICTIONARY DISABLE_P DISCARD DISTINCT DO DOCUMENT_P DOMAIN_P DOUBLE_P DROP
+	DICTIONARY DISABLE_P DISCARD DISPATCH DISTINCT DO DOCUMENT_P DOMAIN_P DOUBLE_P DROP
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ESCAPE EVENT EXCEPT
 	EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN
@@ -11349,21 +11350,30 @@ DropdbStmt: DROP DATABASE database_name
  *		ALTER SYSTEM
  *
  * This is used to change configuration parameters persistently.
+ *
+ * GPDB: optional DISPATCH option to explicitly apply clusterwide change.
  *****************************************************************************/
 
 AlterSystemStmt:
-			ALTER SYSTEM_P SET generic_set
+			ALTER SYSTEM_P SET generic_set opt_dispatch
 				{
 					AlterSystemStmt *n = makeNode(AlterSystemStmt);
 					n->setstmt = $4;
+					n->dispatch = $5;
 					$$ = (Node *)n;
 				}
-			| ALTER SYSTEM_P RESET generic_reset
+			| ALTER SYSTEM_P RESET generic_reset opt_dispatch
 				{
 					AlterSystemStmt *n = makeNode(AlterSystemStmt);
 					n->setstmt = $4;
+					n->dispatch = $5;
 					$$ = (Node *)n;
 				}
+		;
+
+opt_dispatch:
+			DISPATCH								{ $$ = TRUE; }
+			| /* EMPTY */							{ $$ = FALSE; }
 		;
 
 
@@ -16364,6 +16374,7 @@ unreserved_keyword:
 			| DICTIONARY
 			| DISABLE_P
 			| DISCARD
+			| DISPATCH
 			| DOCUMENT_P
 			| DOMAIN_P
 			| DOUBLE_P
