@@ -155,4 +155,8 @@ DATA(insert OID = 7013 (  bitmap	5 1 f f f t t t f f f f f 0 bminsert bmbeginsca
 DESCR("bitmap index access method");
 #define BITMAP_AM_OID 7013
 
+/* GPDB noop index */
+DATA(insert OID = 4500 (  noop		5 0 f f f t t t f f t f t 0 noopinsert noopbeginscan noopgettuple noopgetbitmap nooprescan noopendscan noopmarkpos nooprestrpos noopbuild noopbuild noopbulkdelete noopvacuumcleanup noopcanreturn noopcostestimate noopoptions ));
+DESCR("NOOP index access method, a dummy really");
+
 #endif   /* PG_AM_H */

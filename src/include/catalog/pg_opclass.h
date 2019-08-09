@@ -360,4 +360,23 @@ DATA(insert (	405		cdbhash_complex_ops	PGNSP PGUID 7128 7198 f 0 ));
 DATA(insert (	405		cdbhash_uuid_ops	PGNSP PGUID 7129 2950 f 0 ));
 DATA(insert (	405		cdbhash_enum_ops	PGNSP PGUID 7130 3500 f 0 ));
 
+/* GPDB: noop opclases */
+DATA(insert (	4500	abstime_ops			PGNSP PGUID  421  702 t 0 ));
+DATA(insert (	4500	array_ops			PGNSP PGUID  397 2277 t 0 ));
+DATA(insert (	4500	bit_ops				PGNSP PGUID  423 1560 t 0 ));
+DATA(insert (	4500	bool_ops			PGNSP PGUID  424   16 t 0 ));
+DATA(insert (	4500	bpchar_ops			PGNSP PGUID  426 1042 t 0 ));
+DATA(insert (	4500	bytea_ops			PGNSP PGUID  428   17 t 0 ));
+DATA(insert (	4500	char_ops			PGNSP PGUID  429   18 t 0 ));
+DATA(insert (	4500	cidr_ops			PGNSP PGUID 1974  869 f 0 ));
+DATA(insert (	4500	date_ops			PGNSP PGUID  435 1082 t 0 ));
+DATA(insert (	4500	float4_ops			PGNSP PGUID 1970  700 t 0 ));
+DATA(insert (	4500	float8_ops			PGNSP PGUID 1971  701 t 0 ));
+DATA(insert (	4500	inet_ops			PGNSP PGUID 1974  869 t 0 ));
+DATA(insert (	4500	int2_ops			PGNSP PGUID 1977   21 t 0 ));
+DATA(insert (	4500	int4_ops			PGNSP PGUID 1977   23 t 0 ));
+DATA(insert (	4500	int8_ops			PGNSP PGUID 1977   20 t 0 ));
+DATA(insert (	4500	interval_ops		PGNSP PGUID 1982 1186 t 0 ));
+DATA(insert (	4500	macaddr_ops			PGNSP PGUID 1984  829 t 0 ));
+
 #endif   /* PG_OPCLASS_H */

@@ -5499,6 +5499,36 @@ DESCR("tsm_bernoulli_reset(internal)");
 DATA(insert OID = 3346 (  tsm_bernoulli_cost		PGNSP PGUID 12 1 0 0 0 f f f f t f v 7 0 2278 "2281 2281 2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ tsm_bernoulli_cost _null_ _null_ _null_ ));
 DESCR("tsm_bernoulli_cost(internal)");
 
+
+/* GPDB: XXX: this should be elsewere in this block I guess */
+DATA(insert OID = 4501 (  noopbuild		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 3 0 2281 "2281 2281 2281" _null_ _null_ _null_ _null_ _null_ noopbuild _null_ _null_ _null_ ));
+DATA(insert OID = 4502 (  noopinsert		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 6 0 16 "2281 2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ noopinsert _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4503 (  noopbeginscan	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 3 0 2281 "2281 2281 2281" _null_ _null_ _null_ _null_ _null_	noopbeginscan _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4504 (  noopgettuple		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 16 "2281 2281" _null_ _null_ _null_ _null_ _null_	noopgettuple _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4505 (  noopgetbitmap	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 2281 "2281 2281" _null_ _null_ _null_ _null_ _null_ noopgetbitmap _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4506 (  nooprescan		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 5 0 2278 "2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ nooprescan _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4507 (  noopendscan		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ _null_ noopendscan _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4508 (  noopmarkpos		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ _null_ noopmarkpos _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4509 (  nooprestrpos		   PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 2278 "2281" _null_ _null_ _null_ _null_ _null_ nooprestrpos _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4510 (  noopbulkdelete	   PGNSP PGUID 12 1 0 0 0 f f f f t f v 4 0 2281 "2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ noopbulkdelete _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4511 (  noopvacuumcleanup   PGNSP PGUID 12 1 0 0 0 f f f f t f v 2 0 2281 "2281 2281" _null_ _null_ _null_ _null_ _null_ noopvacuumcleanup _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4512 (  noopcanreturn	   PGNSP PGUID 12 1 0 0 0 f f f f t f s 1 0 16 "2281" _null_ _null_ _null_ _null_ _null_ noopcanreturn _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4513 (  noopcostestimate   PGNSP PGUID 12 1 0 0 0 f f f f t f v 7 0 2278 "2281 2281 2281 2281 2281 2281 2281" _null_ _null_ _null_ _null_ _null_ noopcostestimate _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+DATA(insert OID = 4514 (  noopoptions		   PGNSP PGUID 12 1 0 0 0 f f f f t f s 2 0 17 "1009 16" _null_ _null_ _null_ _null_ _null_  noopoptions _null_ _null_ _null_ ));
+DESCR("noop(internal)");
+
 /* collation management functions */
 DATA(insert OID = 3445 ( pg_import_system_collations  PGNSP PGUID 12 1 0 0 0 f f f f t f v 1 0 23 "26" _null_ _null_ _null_ _null_ _null_ pg_import_system_collations _null_ _null_ _null_ n a ));
 DESCR("import collations from operating system");

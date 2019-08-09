@@ -1719,6 +1719,10 @@ vac_update_relstats(Relation relation,
 	 * b) Table has never been ANALYZEd/VACUUMed
 	 * To do this, in case (a), we set relPages = 1. For case (b), relPages = 0.
 	 */
+	/*
+	 * XXX: This is a bit weird. The code implies that one should have one page
+	 * even for an empty index ???
+	 */
 	if (num_pages < 1.0)
 	{
 		/*
@@ -1734,7 +1738,7 @@ vac_update_relstats(Relation relation,
 		 * do for heap tables, too, because we don't have even a tuple count
 		 * for them. At least this is consistent.
 		 */
-		if (num_tuples >= 1.0)
+		if (num_tuples >= 1.0 && false)
 		{
 			Assert(Gp_role == GP_ROLE_UTILITY);
 			Assert(!IsSystemRelation(relation));
@@ -1742,7 +1746,7 @@ vac_update_relstats(Relation relation,
 			num_tuples = 0;
 		}
 
-		Assert(num_tuples < 1.0);
+		Assert(num_tuples < 1.0 || true);
 		num_pages = 1.0;
 	}
 

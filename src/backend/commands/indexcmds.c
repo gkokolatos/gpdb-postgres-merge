@@ -743,7 +743,9 @@ DefineIndex(Oid relationId,
 	if (stmt->primary)
 		index_check_primary_key(rel, indexInfo, is_alter_table);
 
-	if ((stmt->primary || stmt->unique) && rel->rd_cdbpolicy)
+	/* XXX: This has to be a proper check as isnoop() or similar */
+	if ((stmt->primary || stmt->unique) && rel->rd_cdbpolicy &&
+		strcmp(stmt->accessMethod, "noop") != 0)
 		checkPolicyForUniqueIndex(rel,
 								  indexInfo->ii_KeyAttrNumbers,
 								  indexInfo->ii_NumIndexAttrs,
