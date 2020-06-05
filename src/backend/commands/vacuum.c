@@ -125,7 +125,7 @@ ExecVacuum(ParseState *pstate, VacuumStmt *vacstmt, bool isTopLevel)
 	bool		disable_page_skipping = false;
 	bool		rootonly = false;
 	bool		fullscan = false;
-	int			ao_phase = 0;
+	bool		needs_distributed_xid = false;
 	ListCell   *lc;
 
 	/* Set default value */
@@ -165,11 +165,8 @@ ExecVacuum(ParseState *pstate, VacuumStmt *vacstmt, bool isTopLevel)
 			params.index_cleanup = get_vacopt_ternary_value(opt);
 		else if (strcmp(opt->defname, "truncate") == 0)
 			params.truncate = get_vacopt_ternary_value(opt);
-		else if (Gp_role == GP_ROLE_EXECUTE && strcmp(opt->defname, "ao_phase") == 0)
-		{
-			ao_phase = defGetInt32(opt);
-			Assert((ao_phase & VACUUM_AO_PHASE_MASK) == ao_phase);
-		}
+		else if (strcmp(opt->defname, "needs_distributed_xid") == 0)
+			needs_distributed_xid = defGetBoolean(opt);
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
@@ -185,13 +182,13 @@ ExecVacuum(ParseState *pstate, VacuumStmt *vacstmt, bool isTopLevel)
 		(analyze ? VACOPT_ANALYZE : 0) |
 		(freeze ? VACOPT_FREEZE : 0) |
 		(full ? VACOPT_FULL : 0) |
-		(disable_page_skipping ? VACOPT_DISABLE_PAGE_SKIPPING : 0);
+		(disable_page_skipping ? VACOPT_DISABLE_PAGE_SKIPPING : 0) |
+		(needs_distributed_xid ? VACOPT_NEEDS_DISTRIBUTED_XID : 0);
 
 	if (rootonly)
 		params.options |= VACOPT_ROOTONLY;
 	if (fullscan)
 		params.options |= VACOPT_FULLSCAN;
-	params.options |= ao_phase;
 
 	/* sanity checks on options */
 	Assert(params.options & (VACOPT_VACUUM | VACOPT_ANALYZE));
@@ -296,13 +293,9 @@ vacuum(List *relations, VacuumParams *params,
 	 * a transaction, then our commit- and start-transaction-command calls
 	 * would not have the intended effect!	There are numerous other subtle
 	 * dependencies on this, too.
-	 *
-	 * GPDB: AO vacuum's compaction phase has to run in a distributed
-	 * transaction though.
-	 *
 	 */
 	if ((params->options & VACOPT_VACUUM) &&
-		(params->options & VACUUM_AO_PHASE_MASK) == 0)
+		Gp_role == GP_ROLE_DISPATCH)
 	{
 		PreventInTransactionBlock(isTopLevel, stmttype);
 		in_outer_xact = false;
@@ -399,7 +392,7 @@ vacuum(List *relations, VacuumParams *params,
 	 * transaction block, and also in an autovacuum worker, use own
 	 * transactions so we can release locks sooner.
 	 */
-	if (params->options & VACOPT_AO_COMPACT_PHASE)
+	if (params->options & VACOPT_NEEDS_DISTRIBUTED_XID)
 		use_own_xacts = false;
 	else if (params->options & VACOPT_VACUUM)
 		use_own_xacts = true;
@@ -1799,19 +1792,13 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	Relation	onerel;
 	LockRelId	onerelid;
 	Oid			toast_relid;
-	Oid			aoseg_relid;
-	Oid         aoblkdir_relid;
-	Oid         aovisimap_relid;
 	Oid			save_userid;
 	RangeVar	*this_rangevar = NULL;
-	int			ao_vacuum_phase;
 	int			save_sec_context;
 	int			save_nestlevel;
 	bool		is_appendoptimized;
 
 	Assert(params != NULL);
-
- 	ao_vacuum_phase = (params->options & VACUUM_AO_PHASE_MASK);
 
 	/* Begin a transaction for vacuuming this relation */
 	StartTransactionCommand();
@@ -1870,15 +1857,8 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	 * vacuum, but just ShareUpdateExclusiveLock for concurrent vacuum. Either
 	 * way, we can be sure that no other backend is vacuuming the same table.
 	 */
-	// FIXME: This fault point was roughly here before. It's kept here to keep
-	// the regression tests from hanging, but need to check that the tests
-	// still make sense. And "drop phase" isn't a term we use anymore.
-	if (ao_vacuum_phase == VACOPT_AO_POST_CLEANUP_PHASE)
-	{
-		SIMPLE_FAULT_INJECTOR("vacuum_relation_open_relation_during_drop_phase");
-	}
 
-	// FIXME: what's the right level for AO tables?
+	// GPDB_12_MERGE_FIXME: what's the right level for AO tables?
 	lmode = (params->options & VACOPT_FULL) ?
 		AccessExclusiveLock : ShareUpdateExclusiveLock;
 
@@ -1914,13 +1894,14 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 
 	/*
 	 * Check that it's of a vacuumable relkind.
-	 *
-	 * GPDB_12_MERGE_FIXME: Should AO aux rels be included here?
 	 */
 	if (onerel->rd_rel->relkind != RELKIND_RELATION &&
 		onerel->rd_rel->relkind != RELKIND_MATVIEW &&
 		onerel->rd_rel->relkind != RELKIND_TOASTVALUE &&
-		onerel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE)
+		onerel->rd_rel->relkind != RELKIND_PARTITIONED_TABLE &&
+		onerel->rd_rel->relkind != RELKIND_AOSEGMENTS &&
+		onerel->rd_rel->relkind != RELKIND_AOBLOCKDIR &&
+		onerel->rd_rel->relkind != RELKIND_AOVISIMAP)
 	{
 		ereport(WARNING,
 				(errmsg("skipping \"%s\" --- cannot vacuum non-tables or special system tables",
@@ -1997,21 +1978,11 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	 * Remember the relation's TOAST relation for later, if the caller asked
 	 * us to process it.  In VACUUM FULL, though, the toast table is
 	 * automatically rebuilt by cluster_rel so we shouldn't recurse to it.
-	 *
-	 * GPDB: Also remember the AO segment relations for later.
 	 */
 	if (!(params->options & VACOPT_SKIPTOAST) && !(params->options & VACOPT_FULL))
 		toast_relid = onerel->rd_rel->reltoastrelid;
 	else
 		toast_relid = InvalidOid;
-
-	if (RelationIsAppendOptimized(onerel))
-	{
-		GetAppendOnlyEntryAuxOids(RelationGetRelid(onerel), NULL,
-								  &aoseg_relid,
-								  &aoblkdir_relid, NULL,
-								  &aovisimap_relid, NULL);
-	}
 
 	/*
 	 * Check permissions.
@@ -2069,17 +2040,6 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 		return false;
 	}
 
-#ifdef FAULT_INJECTOR
-	if (ao_vacuum_phase == VACOPT_AO_POST_CLEANUP_PHASE)
-	{
-		FaultInjector_InjectFaultIfSet(
-			"compaction_before_cleanup_phase",
-			DDLNotSpecified,
-			"",	// databaseName
-			RelationGetRelationName(onerel)); // tableName
-	}
-#endif
-
 	/*
 	 * Silently ignore tables that are temp tables of other backends ---
 	 * trying to vacuum these will lead to great unhappiness, since their
@@ -2096,8 +2056,8 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	}
 
 	is_appendoptimized = RelationIsAppendOptimized(onerel);
-
-	if (ao_vacuum_phase && !is_appendoptimized)
+	if ((params->options & VACOPT_NEEDS_DISTRIBUTED_XID) && 
+		!is_appendoptimized)
 	{
 		/* We were asked to some phase of AO vacuum, but it's not an AO table. Huh? */
 		elog(ERROR, "AO vacuum phase was invoked on a non-AO table");
@@ -2154,27 +2114,7 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 			LockRelation(onerel, ShareLock);
 	}
 
-	/*
-	 * Do the actual work --- either FULL or "lazy" vacuum
-	 */
-	if (ao_vacuum_phase == VACOPT_AO_PRE_CLEANUP_PHASE)
-	{
-		ao_vacuum_rel_pre_cleanup(onerel, params->options, params, vac_strategy);
-	}
-	else if (ao_vacuum_phase == VACOPT_AO_COMPACT_PHASE)
-	{
-		ao_vacuum_rel_compact(onerel, params->options, params, vac_strategy);
-	}
-	else if (ao_vacuum_phase == VACOPT_AO_POST_CLEANUP_PHASE)
-	{
-		ao_vacuum_rel_post_cleanup(onerel, params->options, params, vac_strategy);
-	}
-	else if (is_appendoptimized)
-	{
-		/* Do nothing here, we will launch the stages later */
-		Assert(ao_vacuum_phase == 0);
-	}
-	else if ((params->options & VACOPT_FULL))
+	if ((params->options & VACOPT_FULL) && !is_appendoptimized)
 	{
 		int			cluster_options = 0;
 
@@ -2207,31 +2147,6 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	PopActiveSnapshot();
 	CommitTransactionCommand();
 
-	if (is_appendoptimized && ao_vacuum_phase == 0)
-	{
-		int orig_options = params->options;	
-		/* orchestrate the AO vacuum phases */
-		/*
-		 * Do cleanup first, to reclaim as much space as possible that
-		 * was left behind from previous VACUUMs. This runs under local
-		 * transactions.
-		 */
-		params->options = orig_options | VACOPT_AO_PRE_CLEANUP_PHASE;
-		vacuum_rel(relid, this_rangevar, params, false);
-
-		/* Compact. This runs in a distributed transaction.  */
-		params->options = orig_options | VACOPT_AO_COMPACT_PHASE;
-		vacuum_rel(relid, this_rangevar, params, false);
-
-		/* Do a final round of cleanup. Hopefully, this can drop the segments
-		 * that were compacted in the previous phase.
-		 */
-		params->options = orig_options | VACOPT_AO_POST_CLEANUP_PHASE;
-		vacuum_rel(relid, this_rangevar, params, false);
-
-		params->options = orig_options;
-	}
-
 	/*
 	 * If the relation has a secondary toast rel, vacuum that too while we
 	 * still hold the session lock on the master table.  Note however that
@@ -2242,8 +2157,11 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 	if (toast_relid != InvalidOid)
 		vacuum_rel(toast_relid, NULL, params, false);
 
-	if (Gp_role == GP_ROLE_DISPATCH && !recursing &&
-		(!is_appendoptimized || ao_vacuum_phase))
+	/*
+	 * GPDB_12_MERGE_FIXME: we have to deal with the AO aux tables here
+	 */
+
+	if (Gp_role == GP_ROLE_DISPATCH && !recursing)
 	{
 		VacuumStatsContext stats_context;
 		char	   *vsubtype;
@@ -2256,6 +2174,8 @@ vacuum_rel(Oid relid, RangeVar *relation, VacuumParams *params,
 		PushActiveSnapshot(GetTransactionSnapshot());
 
 		stats_context.updated_stats = NIL;
+		if (is_appendoptimized)
+			params->options |= VACOPT_NEEDS_DISTRIBUTED_XID;
 		dispatchVacuum(params, relid, &stats_context);
 		vac_update_relstats_from_list(stats_context.updated_stats);
 
@@ -2413,8 +2333,6 @@ get_vacopt_ternary_value(DefElem *def)
 	return defGetBoolean(def) ? VACOPT_TERNARY_ENABLED : VACOPT_TERNARY_DISABLED;
 }
 
-
-
 /*
  * Dispatch a Vacuum command.
  */
@@ -2426,8 +2344,7 @@ dispatchVacuum(VacuumParams *params, Oid relid, VacuumStatsContext *ctx)
 	int flags = DF_CANCEL_ON_ERROR | DF_WITH_SNAPSHOT;
 	VacuumRelation *rel;
 
-	// GPDB_12_MERGE_FIXME
-	if ((params->options & VACUUM_AO_PHASE_MASK) == VACOPT_AO_COMPACT_PHASE)
+	if (params->options & VACOPT_NEEDS_DISTRIBUTED_XID)
 		flags |= DF_NEED_TWO_PHASE;
 
 	Assert(Gp_role == GP_ROLE_DISPATCH);
@@ -2499,14 +2416,12 @@ vacuum_params_to_options_list(VacuumParams *params)
 		options = lappend(options, makeDefElem("disable_page_skipping", (Node *) makeInteger(1), -1));
 		optmask &= ~VACOPT_DISABLE_PAGE_SKIPPING;
 	}
-
-	if (optmask & VACUUM_AO_PHASE_MASK)
+	if (optmask & VACOPT_NEEDS_DISTRIBUTED_XID)
 	{
-		options = lappend(options, makeDefElem("ao_phase",
-											   (Node *) makeInteger(optmask & VACUUM_AO_PHASE_MASK),
-											   -1));
-		optmask &= ~VACUUM_AO_PHASE_MASK;
+		options = lappend(options, makeDefElem("needs_distributed_xid", (Node *) makeInteger(1), -1));
+		optmask &= ~VACOPT_NEEDS_DISTRIBUTED_XID;
 	}
+
 	if (optmask != 0)
 		elog(ERROR, "unrecognized vacuum option %x", optmask);
 

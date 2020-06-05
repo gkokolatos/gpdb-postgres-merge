@@ -155,16 +155,8 @@ typedef enum VacuumOption
 	,
 	VACOPT_ROOTONLY = 1 << 10,
 	VACOPT_FULLSCAN = 1 << 11,
-
-	/* AO vacuum phases. Mutually exclusive */
-	VACOPT_AO_PRE_CLEANUP_PHASE = 1 << 12,
-	VACOPT_AO_COMPACT_PHASE = 1 << 13,
-	VACOPT_AO_POST_CLEANUP_PHASE = 1 << 14
+	VACOPT_NEEDS_DISTRIBUTED_XID = 1 << 12
 } VacuumOption;
-
-#define VACUUM_AO_PHASE_MASK (VACOPT_AO_PRE_CLEANUP_PHASE | \
-							  VACOPT_AO_COMPACT_PHASE | \
-							  VACOPT_AO_POST_CLEANUP_PHASE)
 
 /*
  * A ternary value used by vacuum parameters.

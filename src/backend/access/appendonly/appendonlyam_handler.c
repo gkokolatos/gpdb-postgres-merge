@@ -938,16 +938,47 @@ appendonly_relation_copy_data(Relation rel, const RelFileNode *newrnode)
 	smgrclose(dstrel);
 }
 
+/*
+ * GPDB_12_MERGE_FIXME:
+ *
+ * A snipped implementation exists in appendonly_vacuum.c which would need to
+ * get revived here and currently is not.
+ */
 static void
 appendonly_vacuum_rel(Relation onerel, VacuumParams *params,
 					  BufferAccessStrategy bstrategy)
 {
+	if (Gp_role == GP_ROLE_DISPATCH)
+		return;
 	/*
-	 * GPDB_12_MERGE_FIXME: This is a dummy function in order to proceed with the
-	 * implementation of the appendonlyam_handler.
-	 * A snipped implementation exists in appendonly_vacuum.c which would need to
-	 * get revived here.
+	 * GPDB_12_MERGE_FIXME:
+	 * Figure out where this fault point should be. It's kept here to keep
+	 * the regression tests from hanging, but need to check that the tests
+	 * still make sense. And "drop phase" isn't a term we use anymore.
 	 */
+/*
+	if (ao_vacuum_phase == VACOPT_AO_POST_CLEANUP_PHASE)
+	{
+		SIMPLE_FAULT_INJECTOR("vacuum_relation_open_relation_during_drop_phase");
+	}
+*/
+
+
+
+	/*
+	 * Do the actual work --- either FULL or "lazy" vacuum
+	 */
+	ao_vacuum_rel_pre_cleanup(onerel, params->options, params, bstrategy);
+	ao_vacuum_rel_compact(onerel, params->options, params, bstrategy);
+#ifdef FAULT_INJECTOR
+		FaultInjector_InjectFaultIfSet(
+			"compaction_before_cleanup_phase",
+			DDLNotSpecified,
+			"",	// databaseName
+			RelationGetRelationName(onerel)); // tableName
+#endif
+	ao_vacuum_rel_post_cleanup(onerel, params->options, params, bstrategy);
+
 	return;
 }
 

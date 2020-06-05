@@ -497,7 +497,7 @@ AppendOnlySegmentFileFullCompaction(Relation aorel,
  * available. If it's not, no segments are dropped.
  */
 void
-AppendOnlyRecycleDeadSegments(Relation aorel)
+AppendOnlyRecycleDeadSegments(Relation aorel, bool use_eq)
 {
 	Relation	pg_aoseg_rel;
 	TupleDesc	pg_aoseg_dsc;
@@ -597,7 +597,10 @@ AppendOnlyRecycleDeadSegments(Relation aorel)
 			if (cutoff_xid == InvalidTransactionId)
 				cutoff_xid = GetOldestXmin(NULL, true);
 
-			visible_to_all = TransactionIdPrecedes(xmin, cutoff_xid);
+			if (use_eq)
+				visible_to_all = TransactionIdPrecedesOrEquals(xmin, cutoff_xid);
+			else
+				visible_to_all = TransactionIdPrecedes(xmin, cutoff_xid);
 		}
 		if (!visible_to_all)
 			continue;

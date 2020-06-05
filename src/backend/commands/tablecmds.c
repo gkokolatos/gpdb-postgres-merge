@@ -5792,7 +5792,7 @@ ATAocsWriteNewColumns(AlteredTableInfo *tab)
 	Assert(rel->rd_rel->relam == AOCO_TABLE_AM_OID);
 
 	/* Try to recycle any old segfiles first. */
-	AppendOnlyRecycleDeadSegments(rel);
+	AppendOnlyRecycleDeadSegments(rel, false);
 
 	segInfos = GetAllAOCSFileSegInfo(rel, snapshot, &nseg);
 	basepath = relpathbackend(rel->rd_node, rel->rd_backend, MAIN_FORKNUM);

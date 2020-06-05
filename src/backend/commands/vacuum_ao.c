@@ -199,7 +199,7 @@ ao_vacuum_rel_pre_cleanup(Relation onerel, int options, VacuumParams *params,
 					get_namespace_name(RelationGetNamespace(onerel)),
 					relname)));
 
-	AppendOnlyRecycleDeadSegments(onerel);
+	AppendOnlyRecycleDeadSegments(onerel, false);
 
 	/*
 	 * Also truncate all live segments to the EOF values stored in pg_aoseg.
@@ -242,7 +242,7 @@ ao_vacuum_rel_post_cleanup(Relation onerel, int options, VacuumParams *params,
 	 */
 	Assert(RelationIsAoRows(onerel) || RelationIsAoCols(onerel));
 
-	AppendOnlyRecycleDeadSegments(onerel);
+	AppendOnlyRecycleDeadSegments(onerel, true);
 
 	vacuum_appendonly_indexes(onerel, options, bstrategy);
 
@@ -291,11 +291,13 @@ ao_vacuum_rel_compact(Relation onerel, int options, VacuumParams *params,
 	 * mode. This also runs in the QD, but it should have no work to do because
 	 * all data resides on QEs nodes.
 	 */
+	/*
 	Assert(Gp_role == GP_ROLE_DISPATCH ||
 		   Gp_role == GP_ROLE_UTILITY ||
 		   DistributedTransactionContext == DTX_CONTEXT_QE_TWO_PHASE_IMPLICIT_WRITER ||
 		   DistributedTransactionContext == DTX_CONTEXT_QE_TWO_PHASE_EXPLICIT_WRITER);
-	Assert(RelationIsAoRows(onerel) || RelationIsAoCols(onerel));
+	*/
+	Assert(RelationIsAppendOptimized(onerel));
 
 	if (options & VACOPT_VERBOSE)
 		elevel = INFO;
