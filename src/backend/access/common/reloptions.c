@@ -98,7 +98,6 @@
  * is only used during VACUUM, which uses a ShareUpdateExclusiveLock,
  * so the VACUUM will not be affected by in-flight changes. Changing its
  * value has no effect until the next VACUUM, so no need for stronger lock.
->>>>>>> 9e1c9f959422192bbe1b842a2a1ffaf76b080196
  */
 
 static relopt_bool boolRelOpts[] =

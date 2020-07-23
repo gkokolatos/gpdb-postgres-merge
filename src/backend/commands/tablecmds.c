@@ -6889,19 +6889,6 @@ static void
 ATPrepAddColumn(List **wqueue, Relation rel, bool recurse, bool recursing,
 				bool is_view, AlterTableCmd *cmd, LOCKMODE lockmode)
 {
-	/* 
-	 * If there's an encoding clause, this better be an append only
-	 * column oriented table.
-	 */
-	ColumnDef *def = (ColumnDef *)cmd->def;
-	if (def->encoding && !RelationIsAoCols(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("ENCODING clause not supported on non column orientated table")));
-
-	if (def->encoding)
-		def->encoding = transformStorageEncodingClause(def->encoding, true);
-
 	if (rel->rd_rel->reloftype && !recursing)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
@@ -7303,35 +7290,7 @@ ATExecAddColumn(List **wqueue, AlteredTableInfo *tab, Relation rel,
 	add_column_datatype_dependency(myrelid, newattnum, attribute.atttypid);
 	add_column_collation_dependency(myrelid, newattnum, attribute.attcollation);
 
-	if (!RelationIsAoCols(rel) && colDef->encoding)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("ENCODING clause not supported on non column orientated table")));
-
-	/* 
-	 * For AO/CO tables, always store an encoding clause. If no encoding
-	 * clause was provided, store the default encoding clause.
-	 */
-	if (RelationIsAoCols(rel))
-	{
-		ColumnReferenceStorageDirective *c;
-		
-		c = makeNode(ColumnReferenceStorageDirective);
-		c->column = colDef->colname;
-
-		if (colDef->encoding)
-			c->encoding = colDef->encoding;
-		else
-		{
-			/* Use the type specific storage directive, if one exists */
-			c->encoding = TypeNameGetStorageDirective(colDef->typeName);
-			
-			if (!c->encoding)
-				c->encoding = default_column_encoding_clause(rel);
-		}
-
-		AddRelationAttributeEncodings(rel, list_make1(c));
-	}
+	add_column_attribute_encoding(rel, newattnum, colDef);
 
 	/* MPP-6929: metadata tracking */
 	if ((Gp_role == GP_ROLE_DISPATCH) && MetaTrackValidKindNsp(rel->rd_rel))

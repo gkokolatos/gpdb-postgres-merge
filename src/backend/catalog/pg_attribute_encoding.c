@@ -65,6 +65,60 @@ add_attribute_encoding_entry(Oid relid, AttrNumber attnum, Datum attoptions)
 	heap_close(rel, RowExclusiveLock);
 }
 
+void
+add_column_attribute_encoding(Relation rel,
+							  AttrNumber attnum,
+							  ColumnDef *colDef)
+{
+	Datum	attoptions;
+	List   *transformedEncoding = NULL;
+	List   *withOpts = NULL;
+	bool	unused;
+
+	if (!RelationIsAoCols(rel))
+	{
+		if (colDef->encoding)
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					 errmsg("ENCODING clause not supported on non column orientated table")));
+		return;
+	}
+
+	{
+		HeapTuple tuple;
+		tuple = SearchSysCache1(RELOID, RelationGetRelid(rel));
+		if (HeapTupleIsValid(tuple))
+		{
+			Datum	datum;
+			bool	isnull;
+			datum = SysCacheGetAttr(RELOID, tuple,
+									Anum_pg_class_reloptions,
+								   &isnull);
+			if (!isnull)
+				withOpts = untransformRelOptions(datum);
+		}
+		ReleaseSysCache(tuple);
+	}
+
+	transformedEncoding = transformAttributeEncoding(list_make1(colDef),
+						   NIL,
+						   withOpts,
+						   false,
+						   &unused);
+
+	if (!transformedEncoding)
+		elog(ERROR, "default values for encoding not set");
+
+	attoptions = transformRelOptions(PointerGetDatum(NULL),
+									 ((ColumnReferenceStorageDirective *)linitial(transformedEncoding))->encoding,
+									 NULL,
+									 NULL,
+									 true,
+									 false);
+
+	add_attribute_encoding_entry(RelationGetRelid(rel), attnum, attoptions);
+}
+
 /*
  * Get the set of functions implementing a compression algorithm.
  *

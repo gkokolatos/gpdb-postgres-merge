@@ -56,4 +56,7 @@ extern void RemoveAttributeEncodingsByRelid(Oid relid);
 extern void cloneAttributeEncoding(Oid oldrelid, Oid newrelid, AttrNumber max_attno);
 extern Datum *get_rel_attoptions(Oid relid, AttrNumber max_attno);
 
+void add_column_attribute_encoding(Relation rel, AttrNumber attnum,
+								   ColumnDef *colDef);
+
 #endif   /* PG_ATTRIBUTE_ENCODING_H */
