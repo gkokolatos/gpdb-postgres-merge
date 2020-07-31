@@ -10,6 +10,8 @@
 
 #include <unistd.h>
 
+#include "lib/stringinfo.h"
+
 #ifndef WIN32
 #define PID_TYPE pid_t
 #define INVALID_PID (-1)
@@ -52,5 +54,5 @@ int			regression_main(int argc, char *argv[],
 							init_function ifunc, test_function tfunc);
 void		add_stringlist_item(_stringlist **listhead, const char *str);
 PID_TYPE	spawn_process(const char *cmdline);
-char	   *replace_string(char *orig, size_t *len, const char *replace, const char *replacement);
+void		replace_string(StringInfo string, const char *replace, const char *replacement);
 bool		file_exists(const char *file);

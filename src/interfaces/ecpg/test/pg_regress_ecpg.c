@@ -23,6 +23,22 @@
 #define LINEBUFSIZE 300
 
 static void
+replace_string_inline(char *string, const char *replace, const char *replacement)
+{
+	char	   *ptr;
+
+	while ((ptr = strstr(string, replace)) != NULL)
+	{
+		char	    *dup = pg_strdup(string);
+
+		strlcpy(string, dup, ptr - string + 1);
+		strcat(string, replacement);
+		strcat(string, dup + (ptr - string) + strlen(replace));
+		free(dup);
+	}
+}
+
+static void
 ecpg_filter(const char *sourcefile, const char *outfile)
 {
 	/*
@@ -31,8 +47,7 @@ ecpg_filter(const char *sourcefile, const char *outfile)
 	 */
 	FILE	   *s,
 			   *t;
-	char	   *linebuf;
-	size_t		linebufsz;
+	char		linebuf[LINEBUFSIZE];
 
 	s = fopen(sourcefile, "r");
 	if (!s)
@@ -47,9 +62,7 @@ ecpg_filter(const char *sourcefile, const char *outfile)
 		exit(2);
 	}
 
-	linebufsz = LINEBUFSIZE;
-	linebuf = malloc(LINEBUFSIZE);
-	while (fgets(linebuf, linebufsz, s))
+	while (fgets(linebuf, LINEBUFSIZE, s))
 	{
 		/* check for "#line " in the beginning */
 		if (strstr(linebuf, "#line ") == linebuf)
@@ -67,12 +80,11 @@ ecpg_filter(const char *sourcefile, const char *outfile)
 			{
 				n = (char *) malloc(plen);
 				StrNCpy(n, p + 1, plen);
-				linebuf = replace_string(linebuf, &linebufsz, n, "");
+				replace_string_inline(linebuf, n, "");
 			}
 		}
 		fputs(linebuf, t);
 	}
-	free(linebuf);
 	fclose(s);
 	fclose(t);
 }
@@ -99,13 +111,11 @@ ecpg_start_test(const char *testname,
 				expectfile_source[MAXPGPATH];
 	char		cmd[MAXPGPATH * 3];
 	char	   *testname_dash;
-	size_t		replace_len;
 
 	snprintf(inprg, sizeof(inprg), "%s/%s", inputdir, testname);
 
 	testname_dash = strdup(testname);
-	replace_len = strlen(testname);
-	testname_dash = replace_string(testname_dash, &replace_len, "/", "-");
+	replace_string_inline(testname_dash, "/", "-");
 	snprintf(expectfile_stdout, sizeof(expectfile_stdout),
 			 "%s/expected/%s.stdout",
 			 outputdir, testname_dash);
@@ -121,14 +131,11 @@ ecpg_start_test(const char *testname,
 	 * not occupy more space than the replaced one.
 	 */
 	outfile_stdout = strdup(expectfile_stdout);
-	replace_len = strlen(expectfile_stdout);
-	outfile_stdout = replace_string(outfile_stdout, &replace_len, "/expected/", "/results/");
+	replace_string_inline(outfile_stdout, "/expected/", "/results/");
 	outfile_stderr = strdup(expectfile_stderr);
-	replace_len = strlen(expectfile_stderr);
-	outfile_stderr = replace_string(outfile_stderr, &replace_len, "/expected/", "/results/");
+	replace_string_inline(outfile_stderr, "/expected/", "/results/");
 	outfile_source = strdup(expectfile_source);
-	replace_len = strlen(expectfile_source);
-	outfile_source = replace_string(outfile_source, &replace_len, "/expected/", "/results/");
+	replace_string_inline(outfile_source, "/expected/", "/results/");
 
 	add_stringlist_item(resultfiles, outfile_stdout);
 	add_stringlist_item(expectfiles, expectfile_stdout);
